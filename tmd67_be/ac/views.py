@@ -69,7 +69,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 
 
 class BadgeViewSet(viewsets.ModelViewSet):
-    filterset_fields = ("first_name", "last_name", "order", "ticket")
+    filterset_fields = ("first_name", "last_name", "order", "ticket", "club")
     permission_classes = (permissions.IsAuthenticated,)
     queryset = Badge.objects.all()
     serializer_class = BadgeSerializer
