@@ -127,38 +127,42 @@ class PaymentRecordViewSet(
         # translation info
         order = Order.objects.get(id=data["order"])
         conf = settings.NEWEB_PAY
-        time_stamp = int(time.time())
-        translation_data = {
-            "MerchantID": conf["MerchantID"],
-            "TimeStamp": time_stamp,
-            "Version": "2.0",
-            "RespondType": "application/json",
-            "MerchantOrderNo": f"{conf['MerchantID']}__{order.id}",
-            "Amt": order.amount,
-            "NotifyURL": conf["NotifyURL"],
-            "ReturnURL": "",
-            "ItemDesc": "TMD67",
-        }
+
         payment_record = PaymentRecord(
             order=order,
-            due_date=datetime.datetime.today() + datetime.timedelta(days=3),
+            due_date=datetime.datetime.utcnow() + datetime.timedelta(days=3),
             description=data["description"] or None,
             merchant_id=conf["MerchantID"],
             is_paid=False,
         )
         payment_record.save()
 
+        translation_data = {
+            "MerchantID": conf["MerchantID"],
+            "Version": conf["Version"],
+            "MerchantOrderNo": f"{conf['MerchantID']}__{order.id}__{payment_record.id}",
+            "TimeStamp": int(time.time()),
+            "Amt": order.amount,
+            "RespondType": "JSON",
+            "ItemDesc": payment_record.description or "TEST",
+            "Email": request.user.email,
+            "NotifyURL": conf["NotifyURL"],
+            "ReturnURL": conf["ReturnURL"],
+        }
+
         # encrypt translation info with php
         urlencode_translation_data = urllib.parse.urlencode(translation_data)
-        _cmd = f"""php tmd67_be/newebpay_encrypt/encrypt.php
-            '{urlencode_translation_data}'
-            '{conf['HashKey']}'
-            '{conf['HashIV']}'
-        """
-        _process = subprocess.Popen(_cmd.split(), stdout=subprocess.PIPE)
-        _stdout, ret_code = _process.communicate()
+        _cmd = [
+            "php",
+            "tmd67_be/newebpay_encrypt/encrypt.php",
+            f"'{urlencode_translation_data}'",
+            f"'{conf['HashKey']}'",
+            f"'{conf['HashIV']}'",
+        ]
+        _process = subprocess.Popen(_cmd, stdout=subprocess.PIPE)
+        _stdout, ret_code = _process.communicate(timeout=2)
         encrypted_data = _stdout.decode("utf8")
-        if ret_code != 0:
+        if ret_code is not None:
             raise exceptions.ValidationError(
                 f"execute '{_cmd}' fail: {encrypted_data}"
             )
@@ -169,15 +173,16 @@ class PaymentRecordViewSet(
             hashlib.sha256(_check_code.encode("utf8")).hexdigest().upper()
         )
         context = {
-            "mpg_gateway": conf["mpg_gateway"],
+            "MPG_GW": conf["MPG_GW"],
             "HashKey": conf["HashKey"],
             "MerchantID": conf["MerchantID"],
             "TradeInfo": encrypted_data,
             "TradeSha": hash_code,
+            "Amount": order.amount,
+            "Version": conf["Version"],
         }
-        webpage = render(request, "newebpay.html", context)
 
-        return webpage
+        return render(request, "newebpay.html", context)
 
 
 def google_auth_rdr(req):
