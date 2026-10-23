@@ -28,13 +28,13 @@ setuptools==83.0.0
 sqlparse==0.6.0
 strawberry-django-plus==1.35
   strawberry-graphql==0.327.2
-    graphql-core==3.2.3
+    graphql-core==3.2.12
     python-dateutil==2.8.2
       six==1.16.0
     typing_extensions==4.4.0
   strawberry-graphql-django==0.8.2
     strawberry-graphql==0.327.2
-      graphql-core==3.2.3
+      graphql-core==3.2.12
       python-dateutil==2.8.2
         six==1.16.0
       typing_extensions==4.4.0
